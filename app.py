@@ -1,20 +1,19 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g
-from flask_sqlalchemy import SQLAlchemy 
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
-import os
 
 app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
-tasks = []
 
-basedir = os.path.abspath(os.path.dirname(__file__)) # Get the directory of the current file
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db') # SQLite database file in the same directory 
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///alc_db.sqlite3'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# Models
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -28,10 +27,11 @@ class User(db.Model):
         return check_password_hash(self.password_hash, pw)
 
 class Task(db.Model):
-    __tablename__ = 'tasks'
+    __tablename__ = 'task'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     title = db.Column(db.String(100), nullable=False)
-    completed = db.Column(db.Boolean, default=False)
+    due_date = db.Column(db.Date, nullable=True)
+    completed = db.Column(db.Boolean, default=False, nullable=False)
 
 # Authentication helpers
 @app.before_request
@@ -43,7 +43,7 @@ def login_required(view):
     @wraps(view)
     def wrapped_view(**kwargs):
         if g.user is None:
-            return redirect('/login')
+            return redirect(url_for('login'))
         return view(**kwargs)
     return wrapped_view
 
@@ -77,55 +77,65 @@ def login():
         else:
             session.clear()
             session['user_id'] = user.id
-            return redirect('/')
+            return redirect(url_for('home'))
     return render_template('auth.html', action='Log In')
 
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect('/login')
+    return redirect(url_for('login'))
 
+# To-do routes
 @app.route('/')
+@login_required
 def home():
-    print("Home route accessed")
-    return render_template('index.html', tasks = tasks)
+    status = request.args.get('filter', 'all')
+    if status == 'pending':
+        tasks = Task.query.filter_by(completed=False).order_by(Task.id).all()
+    elif status == 'completed':
+        tasks = Task.query.filter_by(completed=True).order_by(Task.id).all()
+    else:
+        tasks = Task.query.order_by(Task.id).all()
+    return render_template('todo.html', tasks=tasks, active_filter=status)
 
 @app.route('/add', methods=['POST'])
+@login_required
 def add_task():
-    task_name = request.form["task"]
-    due_date = request.form["due_date"]
-    tasks.append({task_name, due_date})
-    return redirect("/")
-
-@app.route('/clear_all')
-def clear_all_tasks():
-    tasks.clear()
-    return redirect('/')
-
-@app.route('/delete/<int:task_id>')
-def delete_task(task_id):
-    if 0 <= task_id < len(tasks):
-        tasks.pop(task_id)
-    return redirect('/') 
+    title = request.form.get('task')
+    due_date_str = request.form.get('due_date')
+    due_date = None
+    if due_date_str:
+        due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+    new_task = Task(title=title, due_date=due_date)
+    db.session.add(new_task)
+    db.session.commit()
+    return redirect(url_for('home'))
 
 @app.route('/complete/<int:task_id>')
+@login_required
 def complete_task(task_id):
-    task = Task.query.get(task_id)
+    task = Task.query.get_or_404(task_id)
     task.completed = True
     db.session.commit()
-    return redirect('/')  
+    return redirect(url_for('home'))
 
-@app.route('/edit/<int:task_id>', methods=['GET', 'POST'])
-def edit_task(task_id):
-    task = Task.query.get(task_id)
-    if request.method == 'POST':
-        # Update the task title
-        task.title = request.form.get('task')
-        db.session.commit()
-        return redirect('/')
-    return render_template('edit.html', tasks = tasks)
+@app.route('/delete/<int:task_id>')
+@login_required
+def delete_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    db.session.delete(task)
+    db.session.commit()
+    return redirect(url_for('home'))
 
+@app.route('/clear_all')
+@login_required
+def clear_all():
+    Task.query.delete()
+    db.session.commit()
+    return redirect(url_for('home'))
+
+# App entry point
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(host='0.0.0.0',debug=True)
