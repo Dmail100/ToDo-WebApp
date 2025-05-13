@@ -1,24 +1,15 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text, select
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
-import os
-
-DB_USERNAME = "admin"
-DB_PASSWORD = "HybridPower.246"
-DB_ENDPOINT = "my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com"
-DB_NAME = "mydb"
-DB_PORT = 3306
 
 app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
 
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    f"mysql+pymysql://admin:HybridPower.246@my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com:3306/mydb
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///alc_db.sqlite3'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
@@ -36,23 +27,17 @@ class User(db.Model):
         return check_password_hash(self.password_hash, pw)
 
 class Task(db.Model):
-    __tablename__ = 'tasks'
-    __table_args__ = {'schema': 'mydb'}  # Explicitly using the 'mydb' schema
-
+    __tablename__ = 'task'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     title = db.Column(db.String(100), nullable=False)
     due_date = db.Column(db.Date, nullable=True)
     completed = db.Column(db.Boolean, default=False, nullable=False)
 
-
 # Authentication helpers
 @app.before_request
 def load_logged_in_user():
     user_id = session.get('user_id')
-    if user_id:
-        g.user = db.session.get(User, user_id)
-    else:
-        g.user = None
+    g.user = User.query.get(user_id) if user_id else None
 
 def login_required(view):
     @wraps(view)
@@ -63,45 +48,36 @@ def login_required(view):
     return wrapped_view
 
 # Auth routes
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
         if not username or not password:
             flash('Username and password are required.')
+        elif User.query.filter_by(username=username).first():
+            flash('Username already taken.')
         else:
-            stmt = select(User).where(User.username == username)
-            user = db.session.execute(stmt).scalar_one_or_none()
-
-            if user:
-                flash('Username already taken.')
-            else:
-                user = User(username=username)
-                user.set_password(password)
-                db.session.add(user)
-                db.session.commit()
-                flash('Registration successful. Please log in.')
-                return redirect(url_for('login'))
+            user = User(username=username)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            flash('Registration successful. Please log in.')
+            return redirect(url_for('login'))
     return render_template('auth.html', action='Register')
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
-        stmt = select(User).where(User.username == username)
-        user = db.session.execute(stmt).scalar_one_or_none()
-
+        user = User.query.filter_by(username=username).first()
         if user is None or not user.check_password(password):
             flash('Invalid credentials.')
         else:
             session.clear()
             session['user_id'] = user.id
             return redirect(url_for('home'))
-
     return render_template('auth.html', action='Log In')
 
 @app.route('/logout')
@@ -114,15 +90,12 @@ def logout():
 @login_required
 def home():
     status = request.args.get('filter', 'all')
-
     if status == 'pending':
-        stmt = select(Task).where(Task.completed == False).order_by(Task.id)
+        tasks = Task.query.filter_by(completed=False).order_by(Task.id).all()
     elif status == 'completed':
-        stmt = select(Task).where(Task.completed == True).order_by(Task.id)
+        tasks = Task.query.filter_by(completed=True).order_by(Task.id).all()
     else:
-        stmt = select(Task).order_by(Task.id)
-
-    tasks = db.session.execute(stmt).scalars().all()
+        tasks = Task.query.order_by(Task.id).all()
     return render_template('todo.html', tasks=tasks, active_filter=status)
 
 @app.route('/add', methods=['POST'])
@@ -131,24 +104,17 @@ def add_task():
     title = request.form.get('task')
     due_date_str = request.form.get('due_date')
     due_date = None
-
     if due_date_str:
         due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
-
     new_task = Task(title=title, due_date=due_date)
     db.session.add(new_task)
     db.session.commit()
-
     return redirect(url_for('home'))
 
 @app.route('/complete/<int:task_id>')
 @login_required
 def complete_task(task_id):
-    task = db.session.get(Task, task_id)
-    if not task:
-        flash("Task not found.")
-        return redirect(url_for('home'))
-
+    task = Task.query.get_or_404(task_id)
     task.completed = True
     db.session.commit()
     return redirect(url_for('home'))
@@ -156,11 +122,7 @@ def complete_task(task_id):
 @app.route('/delete/<int:task_id>')
 @login_required
 def delete_task(task_id):
-    task = db.session.get(Task, task_id)
-    if not task:
-        flash("Task not found.")
-        return redirect(url_for('home'))
-
+    task = Task.query.get_or_404(task_id)
     db.session.delete(task)
     db.session.commit()
     return redirect(url_for('home'))
@@ -168,7 +130,7 @@ def delete_task(task_id):
 @app.route('/clear_all')
 @login_required
 def clear_all():
-    db.session.execute(text("DELETE FROM task"))  # Raw SQL to delete all
+    Task.query.delete()
     db.session.commit()
     return redirect(url_for('home'))
 
