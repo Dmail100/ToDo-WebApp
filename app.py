@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = (
-    f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_ENDPOINT}:{DB_PORT}/{DB_NAME}"
+    f"mysql+pymysql://mysql+pymysql://admin:HybridPower.246@my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com:3306/mydb
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -36,11 +36,14 @@ class User(db.Model):
         return check_password_hash(self.password_hash, pw)
 
 class Task(db.Model):
-    __tablename__ = 'task'
+    __tablename__ = 'tasks'
+    __table_args__ = {'schema': 'mydb'}  # Explicitly using the 'mydb' schema
+
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     title = db.Column(db.String(100), nullable=False)
     due_date = db.Column(db.Date, nullable=True)
     completed = db.Column(db.Boolean, default=False, nullable=False)
+
 
 # Authentication helpers
 @app.before_request
