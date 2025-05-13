@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
+import pymysql
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
@@ -9,13 +11,22 @@ import os
 DB_USERNAME = "admin"
 DB_PASSWORD = "HybridPower.246"
 DB_ENDPOINT = "my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com"  # e.g. my-db-instance.xxxx.region.rds.amazonaws.com
-DB_NAME = "mydb"
+DB_NAME = "tasks"
 DB_PORT = 3306
 
+# Step 1: Create the database if it doesn't exist
+tmp_engine = sqlalchemy.create_engine(
+    f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_ENDPOINT}:{DB_PORT}"
+)
+
+with tmp_engine.connect() as conn:
+    conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}"))
+    conn.commit()
+
+# Step 2: Connect to the newly created database
 app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
 
-# SQLAlchemy connection string for MySQL (using PyMySQL)
 app.config["SQLALCHEMY_DATABASE_URI"] = (
     f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_ENDPOINT}:{DB_PORT}/{DB_NAME}"
 )
@@ -23,14 +34,14 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
-# Define your model
+# Step 3: Define the model
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# Create the tables
+# Step 4: Create the tables in the 'tasks' database
 with app.app_context():
     db.create_all()
 
