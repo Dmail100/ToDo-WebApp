@@ -3,13 +3,23 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
+import os
+
+# Replace these values with your actual RDS MySQL credentials and endpoint.
+DB_USERNAME = "admin"
+DB_PASSWORD = "HybridPower.246"
+DB_ENDPOINT = "my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com"  # e.g. my-db-instance.xxxx.region.rds.amazonaws.com
+DB_NAME = "mydb"
+DB_PORT = 3306
 
 app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
 
-# Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///alc_db.sqlite3'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# SQLAlchemy connection string for MySQL (using PyMySQL)
+app.config["SQLALCHEMY_DATABASE_URI"] = (
+    f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_ENDPOINT}:{DB_PORT}/{DB_NAME}"
+)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
