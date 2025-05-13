@@ -11,7 +11,7 @@ import os
 DB_USERNAME = "admin"
 DB_PASSWORD = "HybridPower.246"
 DB_ENDPOINT = "my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com"  # e.g. my-db-instance.xxxx.region.rds.amazonaws.com
-DB_NAME = "tasks"
+DB_NAME = "mydb.tasks"
 DB_PORT = 3306
 
 # Step 1: Create the database if it doesn't exist
