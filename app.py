@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = (
-    f"mysql+pymysql://mysql+pymysql://admin:HybridPower.246@my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com:3306/mydb
+    f"mysql+pymysql://admin:HybridPower.246@my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com:3306/mydb
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
