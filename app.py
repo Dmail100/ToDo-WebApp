@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://admin:HybridPower.246@my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com
 
 db = SQLAlchemy(app)
 
