@@ -10,9 +10,9 @@ import os
 app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://admin:HybridPower.246@my-db-instance.cabieyu4wy2m.us-east-1.rds.amazonaws.com/mydb
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///alc_db.sqlite3'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
