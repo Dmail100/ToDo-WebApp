@@ -9,7 +9,10 @@ from flask import jsonify
 
 app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
+tasks = []
 
+
+basedir = os.path.abspath(os.path.dirname(__file__)) # Get the directory of the current file
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://admin:HybridPower.246@my-db.cabieyu4wy2m.us-east-1.rds.amazonaws.com/mydb'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
