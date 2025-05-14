@@ -5,6 +5,7 @@ import pymysql
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
+from flask import jsonify
 
 app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
