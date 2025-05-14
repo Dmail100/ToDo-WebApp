@@ -100,6 +100,8 @@ def home():
         tasks = Task.query.order_by(Task.id).all()
     return render_template('todo.html', tasks=tasks, active_filter=status)
 
+
+
 @app.route('/add', methods=['POST'])
 @login_required
 def add_task():
@@ -120,6 +122,26 @@ def complete_task(task_id):
     task.completed = True
     db.session.commit()
     return redirect(url_for('home'))
+
+@app.route('/api/tasks/<int:task_id>', methods=['POST'])
+@login_required
+def api_update_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    data = request.get_json() or {}
+
+    task.title = data.get('title', task.title)
+    due = data.get('due_date', '')
+    task.due_date = (
+        datetime.strptime(due, '%Y-%m-%d').date()
+        if due else None
+    )
+
+    db.session.commit()
+    return jsonify({
+        "id": task.id,
+        "title": task.title,
+        "due_date": task.due_date.isoformat() if task.due_date else ""
+    })
 
 @app.route('/delete/<int:task_id>')
 @login_required
