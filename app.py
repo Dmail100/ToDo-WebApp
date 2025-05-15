@@ -11,6 +11,7 @@ app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
 tasks = []
 
+
 basedir = os.path.abspath(os.path.dirname(__file__)) # Get the directory of the current file
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://admin:HybridPower.246@my-db.cabieyu4wy2m.us-east-1.rds.amazonaws.com/mydb'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -25,7 +26,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
 
     def set_password(self, pw):
-        self.password_hash = generate_password_hash(pw)
+        self.password_hash = generate_password_hash(pw, method='pbkdf2:sha256')
+        app.logger.debug(f"[SET PASSWORD] Raw: '{pw}' → Hash: {self.password_hash}")
 
     def check_password(self, pw):
         return check_password_hash(self.password_hash, pw)
@@ -70,7 +72,7 @@ def register():
             return redirect(url_for('login'))
     return render_template('auth.html', action='Register')
 
-app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
@@ -95,7 +97,6 @@ def logout():
 
 # To-do routes
 @app.route('/')
-@login_required
 def home():
     status = request.args.get('filter', 'all')
     if status == 'pending':
@@ -109,7 +110,6 @@ def home():
 
 
 @app.route('/add', methods=['POST'])
-@login_required
 def add_task():
     title = request.form.get('task')
     due_date_str = request.form.get('due_date')
@@ -122,7 +122,6 @@ def add_task():
     return redirect(url_for('home'))
 
 @app.route('/complete/<int:task_id>')
-@login_required
 def complete_task(task_id):
     task = Task.query.get_or_404(task_id)
     task.completed = True
@@ -130,7 +129,6 @@ def complete_task(task_id):
     return redirect(url_for('home'))
 
 @app.route('/api/tasks/<int:task_id>', methods=['POST'])
-@login_required
 def api_update_task(task_id):
     task = Task.query.get_or_404(task_id)
     data = request.get_json() or {}
@@ -150,7 +148,6 @@ def api_update_task(task_id):
     })
 
 @app.route('/delete/<int:task_id>')
-@login_required
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     db.session.delete(task)
@@ -158,7 +155,6 @@ def delete_task(task_id):
     return redirect(url_for('home'))
 
 @app.route('/clear_all')
-@login_required
 def clear_all():
     Task.query.delete()
     db.session.commit()
