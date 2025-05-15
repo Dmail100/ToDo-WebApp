@@ -9,29 +9,19 @@ from flask import jsonify
 
 app = Flask(__name__)
 app.secret_key = "replace-with-a-secure-random-key"
-tasks = []
 
-
-basedir = os.path.abspath(os.path.dirname(__file__)) # Get the directory of the current file
+basedir = os.path.abspath(os.path.dirname(__file__))  # Get the directory of the current file
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://admin:HybridPower.246@my-db.cabieyu4wy2m.us-east-1.rds.amazonaws.com/mydb'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# In-memory user storage
+users = {
+    "admin": generate_password_hash("password123")  # Example user
+}
+
 # Models
-class User(db.Model):
-    __tablename__ = 'user'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-
-    def set_password(self, pw):
-        self.password_hash = generate_password_hash(pw, method='pbkdf2:sha256')
-        app.logger.debug(f"[SET PASSWORD] Raw: '{pw}' → Hash: {self.password_hash}")
-
-    def check_password(self, pw):
-        return check_password_hash(self.password_hash, pw)
-
 class Task(db.Model):
     __tablename__ = 'task'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -43,7 +33,7 @@ class Task(db.Model):
 @app.before_request
 def load_logged_in_user():
     user_id = session.get('user_id')
-    g.user = User.query.get(user_id) if user_id else None
+    g.user = user_id if user_id in users else None
 
 def login_required(view):
     @wraps(view)
@@ -54,20 +44,17 @@ def login_required(view):
     return wrapped_view
 
 # Auth routes
-@app.route('/register', methods=['GET','POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         if not username or not password:
             flash('Username and password are required.')
-        elif User.query.filter_by(username=username).first():
+        elif username in users:
             flash('Username already taken.')
         else:
-            user = User(username=username)
-            user.set_password(password)
-            db.session.add(user)
-            db.session.commit()
+            users[username] = generate_password_hash(password)
             flash('Registration successful. Please log in.')
             return redirect(url_for('login'))
     return render_template('auth.html', action='Register')
@@ -78,15 +65,14 @@ def login():
         username = request.form['username']
         password = request.form['password']
         print(f"Login attempt: Username={username}, Password={password}")
-        user = User.query.filter_by(username=username).first()
-        print(f"User found: {user}")
-        if user is None or not user.check_password(password):
+        user_password_hash = users.get(username)
+        if user_password_hash is None or not check_password_hash(user_password_hash, password):
             flash('Invalid credentials.')
             print("Login failed: Invalid credentials.")
         else:
             session.clear()
-            session['user_id'] = user.id
-            print(f"Login successful: User ID={user.id}")
+            session['user_id'] = username
+            print(f"Login successful: Username={username}")
             return redirect(url_for('home'))
     return render_template('auth.html', action='Log In')
 
@@ -97,6 +83,7 @@ def logout():
 
 # To-do routes
 @app.route('/')
+@login_required
 def home():
     status = request.args.get('filter', 'all')
     if status == 'pending':
@@ -107,9 +94,8 @@ def home():
         tasks = Task.query.order_by(Task.id).all()
     return render_template('todo.html', tasks=tasks, active_filter=status)
 
-
-
 @app.route('/add', methods=['POST'])
+@login_required
 def add_task():
     title = request.form.get('task')
     due_date_str = request.form.get('due_date')
@@ -122,6 +108,7 @@ def add_task():
     return redirect(url_for('home'))
 
 @app.route('/complete/<int:task_id>')
+@login_required
 def complete_task(task_id):
     task = Task.query.get_or_404(task_id)
     task.completed = True
@@ -129,6 +116,7 @@ def complete_task(task_id):
     return redirect(url_for('home'))
 
 @app.route('/api/tasks/<int:task_id>', methods=['POST'])
+@login_required
 def api_update_task(task_id):
     task = Task.query.get_or_404(task_id)
     data = request.get_json() or {}
@@ -148,6 +136,7 @@ def api_update_task(task_id):
     })
 
 @app.route('/delete/<int:task_id>')
+@login_required
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     db.session.delete(task)
@@ -155,6 +144,7 @@ def delete_task(task_id):
     return redirect(url_for('home'))
 
 @app.route('/clear_all')
+@login_required
 def clear_all():
     Task.query.delete()
     db.session.commit()
